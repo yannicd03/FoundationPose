@@ -1,0 +1,68 @@
+# FoundationPose image for NVIDIA Blackwell (RTX 50-series, sm_120).
+# The stock image (CUDA 11.3 / torch cu118) has no sm_120 kernels and will not
+# run on this GPU. This rebuilds the stack on CUDA 12.8 with torch cu128 and
+# compiles the GPU extensions for sm_120. Model-based path only — kaolin and
+# bundlesdf (model-free / NeRF) are intentionally omitted; their imports in
+# Utils.py are try/except-guarded.
+#
+# Build (no GPU needed — extensions cross-compile for sm_120 via arch list):
+#   docker build -f docker/Dockerfile.blackwell -t foundationpose:blackwell .
+# Run needs the GPU (nvidia-container-toolkit): see docker/run_container.blackwell.sh
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive TZ=Europe/Berlin
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git wget curl ca-certificates build-essential g++ gcc cmake ninja-build \
+      python3.10 python3.10-dev python3.10-venv python3-pip \
+      libeigen3-dev \
+      libgl1 libglib2.0-0 libegl1 libgles2 libosmesa6 libglu1-mesa freeglut3-dev \
+      libsm6 libxext6 libxrender1 ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# pybind11 (cmake config) for the mycpp C++ extension
+RUN cd /opt && git clone --depth 1 -b v2.11.1 https://github.com/pybind/pybind11 && \
+    cd pybind11 && cmake -S . -B build -DPYBIND11_TEST=OFF -DPYBIND11_INSTALL=ON && \
+    cmake --build build --target install -j && cd / && rm -rf /opt/pybind11
+
+# isolated python env
+RUN python3.10 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+RUN pip install --no-cache-dir --upgrade pip wheel setuptools
+
+# toolchain knobs for source-built CUDA extensions
+ENV CUDA_HOME=/usr/local/cuda
+ENV TORCH_CUDA_ARCH_LIST="12.0"
+ENV FORCE_CUDA=1
+ENV MAX_JOBS=8
+
+# PyTorch with CUDA 12.8 (includes sm_120 / Blackwell kernels)
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
+# GPU extensions, compiled from source against this torch + nvcc 12.8 for sm_120
+RUN pip install --no-cache-dir --no-build-isolation "git+https://github.com/facebookresearch/pytorch3d.git"
+RUN pip install --no-cache-dir --no-build-isolation "git+https://github.com/NVlabs/nvdiffrast.git"
+
+# remaining python deps (torch already present, so it is skipped)
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Boost for the mycpp C++ extension (system + program_options). Added as a late
+# layer so the cached torch/pytorch3d/nvdiffrast layers above are reused.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libboost-system-dev libboost-program-options-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pybind11 to a numpy-2.0-ABI-aware release (>=2.12). The earlier
+# v2.11.1 segfaults when mycpp.cluster_poses receives numpy>=2 arrays. Late
+# layer (overwrites the headers) to keep the heavy cached layers intact.
+RUN cd /opt && git clone --depth 1 -b v2.13.6 https://github.com/pybind/pybind11 && \
+    cd pybind11 && cmake -S . -B build -DPYBIND11_TEST=OFF -DPYBIND11_INSTALL=ON && \
+    cmake --build build --target install -j && cd / && rm -rf /opt/pybind11
+
+ENV OPENCV_IO_ENABLE_OPENEXR=1
+ENV PYOPENGL_PLATFORM=egl
+ENV SHELL=/bin/bash
+WORKDIR /workspace
+CMD ["bash"]
