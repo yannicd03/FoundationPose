@@ -23,16 +23,9 @@ This fork adds a Docker build for Blackwell (sm_120) GPUs used by the
 build `docker/Dockerfile.blackwell` as `foundationpose:blackwell`
 (see `docker/run_container.blackwell.sh`).
 
-The network weights (refiner + scorer, ~250 MB) are also mirrored in the
-[KIP shared Drive folder](https://drive.google.com/drive/folders/1nqdLp07KnoxGWrx0MydLLub6UK1HHmsA?usp=sharing)
-as `foundationpose_weights.tar.gz` — extract it at the repo root so the
-checkpoints land under `weights/`:
-
-```bash
-tar -xzf foundationpose_weights.tar.gz -C /path/to/FoundationPose
-```
-
-(Alternatively download them from the official link in the install steps below.)
+The network weights (refiner `2023-10-28-18-33-37` + scorer
+`2024-01-11-20-02-45`, ~250 MB) are downloaded from the official link in the
+install steps below and placed under `weights/` at the repo root.
 
 ## Demos
 
