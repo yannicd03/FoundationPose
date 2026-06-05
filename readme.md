@@ -16,6 +16,24 @@ We present FoundationPose, a unified foundation model for 6D object pose estimat
 **🥇 No. 1 on the world-wide [BOP leaderboard](https://bop.felk.cvut.cz/leaderboards/pose-estimation-unseen-bop23/core-datasets/) (as of 2024/03) for model-based novel object pose estimation.**
 <img src="assets/bop.jpg" width="80%">
 
+## KIP fork notes
+
+This fork adds a Docker build for Blackwell (sm_120) GPUs used by the
+[kip-pose-detection viewer](https://github.com/yannicd03/kip-pose-detection):
+build `docker/Dockerfile.blackwell` as `foundationpose:blackwell`
+(see `docker/run_container.blackwell.sh`).
+
+The network weights (refiner + scorer, ~250 MB) are also mirrored in the
+[KIP shared Drive folder](https://drive.google.com/drive/folders/1nqdLp07KnoxGWrx0MydLLub6UK1HHmsA?usp=sharing)
+as `foundationpose_weights.tar.gz` — extract it at the repo root so the
+checkpoints land under `weights/`:
+
+```bash
+tar -xzf foundationpose_weights.tar.gz -C /path/to/FoundationPose
+```
+
+(Alternatively download them from the official link in the install steps below.)
+
 ## Demos
 
 Robotic Applications:
